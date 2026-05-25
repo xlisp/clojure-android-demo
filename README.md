@@ -57,15 +57,24 @@ Or just open this folder in Android Studio and Run.
 | minify | **off** (Clojure relies on runtime reflection) |
 | on-device translator | `com.android.tools:r8:8.2.47` |
 
+Verified on an API 36 emulator (see screenshot above): boot ≈ 4 s, both AOT
+calls, and both on-device `eval`s succeed (`(+ 1 2) = 3`,
+`(mapv sq (range 1 6)) = [1 4 9 16 25]`), plus interactive REPL input.
+
 ## Notes & gotchas
 
-- **First boot is slow** (~1–2 s) — loading the AOT'd `clojure.core` and, for
+- **First boot takes a few seconds** — loading the AOT'd `clojure.core` and, for
   eval, running r8/d8 on the device. All Clojure work is on a background thread
   to avoid ANR.
 - **`largeHeap="true"`** is set; Clojure's runtime is memory-hungry.
-- The eval path bundles r8 (~MBs) into the APK so d8 can run on the device. If
-  on-device d8 misbehaves on a given device, the AOT path still works and the
-  eval errors are shown in the output pane (not swallowed).
+- The eval path bundles r8 (~MBs) into the APK so d8 can run on the device.
+  Errors (if any) are shown in the output pane and logged to `logcat -s ClojureDemo`,
+  not swallowed.
+- **Two extra fixes** in the patched jar were needed for on-device eval (beyond
+  the classloader patch), both in `../clojure`: a real `InputStream` path in
+  `load-data-readers`, and a `Reflector.<clinit>` guard for Android's missing
+  `AccessibleObject.canAccess`. Without them `RT` init / dynamic compilation crash
+  on ART. See `../clojure/android-support/README.md`.
 - `app/src/main/assets/data_readers.clj` is read by the patched
   `load-data-readers` via `DalvikDynamicClassLoader.getDataReadersStream()`.
 - To use the **legacy dx** loader instead of d8, swap in
