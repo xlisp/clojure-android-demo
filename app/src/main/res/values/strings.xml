@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Clojure 1.13 Demo</string>
+    <string name="eval">Eval</string>
+    <string name="input_hint">(reduce + (range 100))</string>
+</resources>
