@@ -1,0 +1,56 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.example.clojuredemo'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.example.clojuredemo"
+        minSdk 26               // d8 + InMemoryDexClassLoader (DalvikDynamicClassLoader) needs API >= 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+        multiDexEnabled true    // Clojure + r8 blow past the 64K method limit
+    }
+
+    buildTypes {
+        release {
+            // Clojure relies on reflection heavily; keep shrinking off for the demo.
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packaging {
+        resources {
+            // Several Clojure/r8 jars ship overlapping metadata files.
+            excludes += ['META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA',
+                         'META-INF/LICENSE*', 'META-INF/NOTICE*', 'META-INF/*.kotlin_module',
+                         'data_readers.clj', 'data_readers.cljc']
+            pickFirsts += ['**/*.clj', '**/*.cljc', '**/*.cljs']
+        }
+    }
+}
+
+dependencies {
+    // The patched Clojure built by ../clojure/build-jar.sh, plus its two AOT deps.
+    implementation files('libs/clojure-1.13.0-master-SNAPSHOT.jar')
+    implementation files('libs/spec.alpha-0.5.238.jar')
+    implementation files('libs/core.specs.alpha-0.4.74.jar')
+
+    // d8/r8 translator, run ON the device by DalvikDynamicClassLoader to turn
+    // Clojure-generated JVM bytecode into DEX at eval time.
+    implementation 'com.android.tools:r8:8.2.47'
+
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+}
