@@ -137,9 +137,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private static String stack(Throwable t) {
-        StringBuilder sb = new StringBuilder(String.valueOf(t.getMessage()));
-        Throwable c = t.getCause();
-        if (c != null) sb.append("\n  caused by: ").append(c);
+        android.util.Log.e(MyApp.TAG, "clojure error", t);
+        java.io.StringWriter sw = new java.io.StringWriter();
+        t.printStackTrace(new java.io.PrintWriter(sw));
+        String full = sw.toString();
+        // Keep the UI readable: first ~20 lines of the trace.
+        String[] lines = full.split("\n");
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < Math.min(lines.length, 20); i++) sb.append(lines[i]).append('\n');
         return sb.toString();
     }
 

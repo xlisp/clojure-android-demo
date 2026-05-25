@@ -5,6 +5,8 @@ A minimal Android app that runs the **patched Clojure 1.13** (the
 including on-device `eval` — JVM bytecode is translated to DEX at runtime by
 `clojure.lang.DalvikDynamicClassLoader` (d8 + `InMemoryDexClassLoader`).
 
+![](./clj_demo3.png)
+
 ## What it shows
 
 On launch (`MainActivity`):
