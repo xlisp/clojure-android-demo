@@ -7,6 +7,14 @@ including on-device `eval` — JVM bytecode is translated to DEX at runtime by
 
 ![](./clj_demo3.png)
 
+## Emacs cider connect
+
+```
+adb forward tcp:6688 tcp:6688
+M-x cider-connect RET  Host: localhost RET  Port: 6688 RET
+```
+![](./repl-6688.png)
+
 ## What it shows
 
 On launch (`MainActivity`):
