@@ -1,6 +1,8 @@
 package com.example.clojuredemo;
 
+import android.app.Activity;
 import android.app.Application;
+import android.os.Bundle;
 import android.util.Log;
 
 import clojure.lang.DalvikDynamicClassLoader;
@@ -23,6 +25,12 @@ public class MyApp extends Application {
 
     /** Port the remote nREPL server listens on; connect with `adb forward tcp:6688 tcp:6688`. */
     public static final int NREPL_PORT = 6688;
+
+    /**
+     * The foreground Activity, tracked below. Lets Clojure code evaluated from the
+     * nREPL grab an Activity (e.g. to swap in a Clojure-built View). See demo/ui.clj.
+     */
+    public static volatile Activity currentActivity;
 
     // (do (require 'nrepl.server)
     //     (binding [*ns* (create-ns 'user)] (refer-clojure))   ; nREPL's default session ns
@@ -48,8 +56,24 @@ public class MyApp extends Application {
         Log.i(TAG, "DalvikDynamicClassLoader installed; vm.name="
                 + System.getProperty("java.vm.name"));
 
-        // 3. Start the remote nREPL server so Emacs CIDER can connect.
+        // 3. Track the foreground Activity so REPL code can reach it.
+        registerActivityLifecycleCallbacks(new ActivityTracker());
+
+        // 4. Start the remote nREPL server so Emacs CIDER can connect.
         startNreplServer();
+    }
+
+    /** Records the resumed Activity in {@link #currentActivity}; all else is no-op. */
+    private static final class ActivityTracker implements ActivityLifecycleCallbacks {
+        @Override public void onActivityResumed(Activity a) { currentActivity = a; }
+        @Override public void onActivityPaused(Activity a) {
+            if (currentActivity == a) currentActivity = null;
+        }
+        @Override public void onActivityCreated(Activity a, Bundle b) {}
+        @Override public void onActivityStarted(Activity a) {}
+        @Override public void onActivityStopped(Activity a) {}
+        @Override public void onActivitySaveInstanceState(Activity a, Bundle b) {}
+        @Override public void onActivityDestroyed(Activity a) {}
     }
 
     /**
