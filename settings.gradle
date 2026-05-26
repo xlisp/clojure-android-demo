@@ -10,6 +10,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url 'https://repo.clojars.org' }   // nREPL is published to Clojars
     }
 }
 

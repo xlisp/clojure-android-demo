@@ -45,6 +45,37 @@ adb logcat -s ClojureDemo                 # watch the loader log
 
 Or just open this folder in Android Studio and Run.
 
+## Remote nREPL (Emacs CIDER)
+
+`MyApp.onCreate` also starts a network **nREPL server on port 6688** (see
+`MyApp.NREPL_PORT`). It boots on a background thread by `load-string`-ing
+`(require 'nrepl.server)` + `nrepl.server/start-server` — i.e. nREPL's own `.clj`
+sources are compiled on-device through the same d8 path as user eval. The
+`nrepl:nrepl:1.0.0` dependency (clojure excluded) is in `app/build.gradle`, and
+`INTERNET` permission is in the manifest.
+
+Connect from Emacs:
+
+```bash
+./gradlew :app:installDebug
+adb shell am start -n com.example.clojuredemo/.MainActivity   # launches → starts nREPL
+adb logcat -s ClojureDemo                                     # wait for "nREPL server listening on 0.0.0.0:6688"
+adb forward tcp:6688 tcp:6688                                 # tunnel device port to your machine
+```
+
+```
+M-x cider-connect RET  Host: localhost RET  Port: 6688 RET
+```
+
+Notes:
+- The server binds `0.0.0.0`, so you can also `cider-connect` straight to the
+  device/emulator IP on a LAN; `adb forward` is the simplest/safest path.
+- It's a **plain** nREPL (no `cider-nrepl` middleware) — eval/load works; some
+  CIDER extras (completion, debugger) need cider-nrepl, which is heavy to compile
+  on-device and left out on purpose.
+- First connect is slow: requiring `nrepl.server` compiles all of nREPL via d8.
+  Watch `logcat -s ClojureDemo`; start CIDER after the "listening" line.
+
 ## Versions / config
 
 | | |

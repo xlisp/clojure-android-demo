@@ -52,5 +52,12 @@ dependencies {
     // Clojure-generated JVM bytecode into DEX at eval time.
     implementation 'com.android.tools:r8:8.2.47'
 
+    // Remote nREPL server (so Emacs CIDER can connect). nREPL ships pure .clj
+    // sources; they ride the same on-device d8 compile path as user eval.
+    // Exclude its clojure dep -- we run the patched 1.13 from libs/ above.
+    implementation('nrepl:nrepl:1.0.0') {
+        exclude group: 'org.clojure', module: 'clojure'
+    }
+
     implementation 'androidx.appcompat:appcompat:1.6.1'
 }
