@@ -191,6 +191,9 @@
 (defn- build-server [^InputStream in ^OutputStream out]
   (-> (McpServer/async (StdioServerTransportProvider. json-mapper in out))
       (.serverInfo "clojure-android-mcp" "0.1.0")
+      ;; Set the mapper explicitly: the default goes through ServiceLoader.findFirst()
+      ;; (a Java 9 API missing on API <33) and would crash on build.
+      (.jsonMapper json-mapper)
       (.jsonSchemaValidator permissive-validator)
       (.capabilities (-> (McpSchema$ServerCapabilities/builder)
                          (.tools true)
@@ -201,24 +204,29 @@
 (defn- serve-connection
   "Run one MCP session over the socket until the client disconnects (EOF)."
   [^Socket sock]
-  (let [done (promise)
-        raw (.getInputStream sock)
-        ;; deliver `done` when the transport's reader hits EOF on the socket
-        in (proxy [FilterInputStream] [raw]
-             (read
-               ([] (let [b (proxy-super read)]
-                     (when (neg? b) (deliver done true)) b))
-               ([buf off len] (let [n (proxy-super read buf off len)]
-                                (when (neg? n) (deliver done true)) n))))
-        out (.getOutputStream sock)
-        server (build-server in out)]
-    (log-i "MCP client connected")
-    (try
-      @done
-      (finally
-        (try (.subscribe (.closeGracefully server)) (catch Throwable _))
-        (try (.close sock) (catch Throwable _))
-        (log-i "MCP client disconnected")))))
+  (try
+    (let [done (promise)
+          raw (.getInputStream sock)
+          ;; deliver `done` when the transport's reader hits EOF on the socket
+          in (proxy [FilterInputStream] [raw]
+               (read
+                 ([] (let [b (proxy-super read)]
+                       (when (neg? b) (deliver done true)) b))
+                 ([buf off len] (let [n (proxy-super read buf off len)]
+                                  (when (neg? n) (deliver done true)) n))))
+          out (.getOutputStream sock)
+          server (build-server in out)]
+      (log-i "MCP client connected")
+      (try
+        @done
+        (finally
+          (try (.subscribe (.closeGracefully server)) (catch Throwable _))
+          (try (.close sock) (catch Throwable _))
+          (log-i "MCP client disconnected"))))
+    ;; Never let a connection error reach the default handler (it would kill the app).
+    (catch Throwable t
+      (log-e "MCP connection handler error" t)
+      (try (.close sock) (catch Throwable _)))))
 
 (defonce ^:private server-socket (atom nil))
 
