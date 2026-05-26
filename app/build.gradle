@@ -15,6 +15,12 @@ android {
         multiDexEnabled true    // Clojure + r8 blow past the 64K method limit
     }
 
+    sourceSets {
+        // Package src/main/clojure/**.clj as APK resources so `(require 'demo.ui)`
+        // can locate + compile them on-device (no build-time Clojure AOT here).
+        main { resources.srcDirs += ['src/main/clojure'] }
+    }
+
     buildTypes {
         release {
             // Clojure relies on reflection heavily; keep shrinking off for the demo.
@@ -60,4 +66,5 @@ dependencies {
     }
 
     implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.drawerlayout:drawerlayout:1.2.0'   // left navigation drawer
 }

@@ -3,19 +3,24 @@ package com.example.clojuredemo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.drawerlayout.widget.DrawerLayout;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import clojure.lang.IFn;
 import clojure.lang.RT;
+import clojure.lang.Symbol;
 import clojure.lang.Var;
 
 /**
@@ -31,6 +36,11 @@ public class MainActivity extends AppCompatActivity {
     private final ExecutorService clojureExec = Executors.newSingleThreadExecutor();
     private final Handler ui = new Handler(Looper.getMainLooper());
 
+    private DrawerLayout drawer;
+    private ActionBarDrawerToggle toggle;
+    private FrameLayout contentContainer;
+    private View evalView;
+
     private TextView output;
     private ScrollView scroller;
     private EditText input;
@@ -41,10 +51,25 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        output = findViewById(R.id.output);
-        scroller = findViewById(R.id.scroller);
-        input = findViewById(R.id.input);
-        evalButton = findViewById(R.id.evalButton);
+        // Left navigation drawer + hamburger icon in the action bar.
+        drawer = findViewById(R.id.drawer);
+        toggle = new ActionBarDrawerToggle(
+                this, drawer, R.string.drawer_open, R.string.drawer_close);
+        drawer.addDrawerListener(toggle);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
+        toggle.syncState();
+
+        // The Eval screen lives in the swappable content container.
+        contentContainer = findViewById(R.id.content_container);
+        evalView = getLayoutInflater().inflate(R.layout.content_eval, contentContainer, false);
+        contentContainer.addView(evalView);
+
+        output = evalView.findViewById(R.id.output);
+        scroller = evalView.findViewById(R.id.scroller);
+        input = evalView.findViewById(R.id.input);
+        evalButton = evalView.findViewById(R.id.evalButton);
         evalButton.setEnabled(false);
 
         evalButton.setOnClickListener(new View.OnClickListener() {
@@ -54,8 +79,55 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        // Drawer menu entries.
+        findViewById(R.id.menu_home).setOnClickListener(v -> showEval());
+        findViewById(R.id.menu_clojure_ui).setOnClickListener(v -> showClojureUi());
+
         append("Booting Clojure runtime…");
         bootstrapAsync();
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        return toggle.onOptionsItemSelected(item) || super.onOptionsItemSelected(item);
+    }
+
+    /** Drawer: show the built-in Eval screen. */
+    private void showEval() {
+        if (evalView.getParent() != contentContainer) {
+            contentContainer.removeAllViews();
+            contentContainer.addView(evalView);
+        }
+        drawer.closeDrawers();
+    }
+
+    /**
+     * Drawer: enter the Clojure-authored page. Requires demo.ui (compiled
+     * on-device from the .clj packaged in the APK), then injects its View into
+     * the content container. Falls back to the Eval screen on failure.
+     */
+    private void showClojureUi() {
+        drawer.closeDrawers();
+        clojureExec.execute(() -> {
+            try {
+                RT.var("clojure.core", "require").invoke(Symbol.intern("demo.ui"));
+                ui.post(() -> {
+                    try {
+                        View page = (View) RT.var("demo.ui", "build-view").invoke(this);
+                        contentContainer.removeAllViews();
+                        contentContainer.addView(page);
+                    } catch (Throwable t) {
+                        showEval();
+                        append("\n!! demo.ui/build-view failed:\n" + stack(t));
+                    }
+                });
+            } catch (Throwable t) {
+                ui.post(() -> {
+                    showEval();
+                    append("\n!! require demo.ui failed:\n" + stack(t));
+                });
+            }
+        });
     }
 
     /** Force RT static init (loads clojure.core) and run the AOT smoke tests. */
