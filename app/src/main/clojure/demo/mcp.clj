@@ -26,11 +26,14 @@
   Start from Java at boot (MyApp), or live from CIDER:
       (require 'demo.mcp) (demo.mcp/start!)   ; => \"MCP server listening ...\"
       (demo.mcp/stop!)"
+  (:require [demo.mcp-json :as mjson])
   (:import
    [java.net ServerSocket Socket]
    [java.io FilterInputStream StringWriter InputStream OutputStream]
    [java.util.function Consumer BiFunction]
    [clojure.lang DalvikDynamicClassLoader]
+   [io.modelcontextprotocol.json McpJsonMapper]
+   [io.modelcontextprotocol.json.schema JsonSchemaValidator JsonSchemaValidator$ValidationResponse]
    [io.modelcontextprotocol.server.transport StdioServerTransportProvider]
    [io.modelcontextprotocol.server McpServer McpServerFeatures$AsyncToolSpecification]
    [io.modelcontextprotocol.spec
@@ -39,8 +42,6 @@
     McpSchema$CallToolRequest
     McpSchema$CallToolResult
     McpSchema$TextContent]
-   [io.modelcontextprotocol.json.jackson3 JacksonMcpJsonMapper]
-   [tools.jackson.databind.json JsonMapper]
    [reactor.core.publisher Mono]))
 
 (def ^:const TAG "ClojureDemo")
@@ -98,8 +99,16 @@
 
 ;; ---- MCP SDK interop (trimmed from clojure-mcp-new's core.clj, SDK 1.1.3) ----
 
-(defonce ^JacksonMcpJsonMapper json-mapper
-  (JacksonMcpJsonMapper. (JsonMapper.)))
+;; Jackson-free mapper so this works on Android API 26–32 (see demo.mcp-json).
+(defonce ^McpJsonMapper json-mapper (mjson/make-mapper))
+
+;; The SDK's default JSON-schema validator is the Jackson-3 one (needs
+;; Class.isRecord(), API 33+). Supply a permissive validator so tool-arg
+;; validation never touches Jackson on older devices.
+(defonce ^JsonSchemaValidator permissive-validator
+  (reify JsonSchemaValidator
+    (validate [_ _schema _content]
+      (JsonSchemaValidator$ValidationResponse/asValid nil))))
 
 (defn- mono-from-callback
   "Wrap (exchange args fill) as a Reactor Mono the SDK can subscribe to."
@@ -182,6 +191,7 @@
 (defn- build-server [^InputStream in ^OutputStream out]
   (-> (McpServer/async (StdioServerTransportProvider. json-mapper in out))
       (.serverInfo "clojure-android-mcp" "0.1.0")
+      (.jsonSchemaValidator permissive-validator)
       (.capabilities (-> (McpSchema$ServerCapabilities/builder)
                          (.tools true)
                          (.build)))
