@@ -81,7 +81,9 @@ public class MainActivity extends AppCompatActivity {
 
         // Drawer menu entries.
         findViewById(R.id.menu_home).setOnClickListener(v -> showEval());
-        findViewById(R.id.menu_clojure_ui).setOnClickListener(v -> showClojureUi());
+        findViewById(R.id.menu_clojure_ui).setOnClickListener(v -> showClojurePage("demo.ui"));
+        findViewById(R.id.menu_calc).setOnClickListener(v -> showClojurePage("demo.calc"));
+        findViewById(R.id.menu_input).setOnClickListener(v -> showClojurePage("demo.input"));
 
         append("Booting Clojure runtime…");
         bootstrapAsync();
@@ -102,29 +104,31 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Drawer: enter the Clojure-authored page. Requires demo.ui (compiled
-     * on-device from the .clj packaged in the APK), then injects its View into
-     * the content container. Falls back to the Eval screen on failure.
+     * Drawer: enter a Clojure-authored page. Requires the namespace (compiled
+     * on-device from the .clj packaged in the APK), then injects its
+     * (ns/build-view this) View into the content container. Falls back to the
+     * Eval screen on failure. First load of an unseen ns triggers d8/DEX
+     * compilation and can take a while, so it runs off the UI thread.
      */
-    private void showClojureUi() {
+    private void showClojurePage(final String ns) {
         drawer.closeDrawers();
         clojureExec.execute(() -> {
             try {
-                RT.var("clojure.core", "require").invoke(Symbol.intern("demo.ui"));
+                RT.var("clojure.core", "require").invoke(Symbol.intern(ns));
                 ui.post(() -> {
                     try {
-                        View page = (View) RT.var("demo.ui", "build-view").invoke(this);
+                        View page = (View) RT.var(ns, "build-view").invoke(this);
                         contentContainer.removeAllViews();
                         contentContainer.addView(page);
                     } catch (Throwable t) {
                         showEval();
-                        append("\n!! demo.ui/build-view failed:\n" + stack(t));
+                        append("\n!! " + ns + "/build-view failed:\n" + stack(t));
                     }
                 });
             } catch (Throwable t) {
                 ui.post(() -> {
                     showEval();
-                    append("\n!! require demo.ui failed:\n" + stack(t));
+                    append("\n!! require " + ns + " failed:\n" + stack(t));
                 });
             }
         });

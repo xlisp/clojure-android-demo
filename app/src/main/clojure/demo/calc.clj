@@ -126,11 +126,13 @@
                  (.setText "= 0")
                  (.setTextSize 22.0)
                  (.setGravity (bit-or Gravity/END Gravity/CENTER_VERTICAL))
-                 (.setTextColor (Color/parseColor "#2E7D32")))
+                 (.setTextColor (Color/parseColor "#FFEB3B")))
         input  (doto (EditText. activity)
                  (.setHint "1+2*3")
                  (.setTextSize 28.0)
                  (.setGravity (bit-or Gravity/END Gravity/CENTER_VERTICAL))
+                 (.setTextColor (Color/parseColor "#FFFFFF"))
+                 (.setHintTextColor (Color/parseColor "#90CAF9"))
                  ;; plain text (NOT number type -- that installs a digits-only
                  ;; filter that silently drops + - * / ( ) appended by buttons);
                  ;; buttons drive the input, so suppress the soft keyboard.
@@ -167,11 +169,12 @@
     (doto (LinearLayout. activity)
       (.setOrientation LinearLayout/VERTICAL)
       (.setPadding pad pad pad pad)
+      (.setBackgroundColor (Color/parseColor "#1565C0"))
 
       (.addView (doto (TextView. activity)
                   (.setText "Clojure 计算器 🧮")
                   (.setTextSize 20.0)
-                  (.setTextColor (Color/parseColor "#1565C0"))))
+                  (.setTextColor (Color/parseColor "#FFFFFF"))))
 
       (.addView input)
       (.addView result)

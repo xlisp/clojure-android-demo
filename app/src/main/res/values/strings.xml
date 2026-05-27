@@ -5,6 +5,8 @@
     <string name="input_hint">(reduce + (range 100))</string>
     <string name="menu_repl">REPL / Eval</string>
     <string name="menu_clojure_ui">Clojure UI demo 🍃</string>
+    <string name="menu_calc">计算器 🧮</string>
+    <string name="menu_input">输入 demo ⌨️</string>
     <string name="drawer_open">Open menu</string>
     <string name="drawer_close">Close menu</string>
 </resources>
