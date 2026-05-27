@@ -368,8 +368,11 @@ def run_tool(client: NreplClient, name: str, args: dict) -> tuple[str, bool]:
     if name == "android_vm_info":
         code = ("{:vm (System/getProperty \"java.vm.name\")"
                 " :vm-version (System/getProperty \"java.vm.version\")"
+                " :os-version (System/getProperty \"os.version\")"
+                " :android-sdk android.os.Build$VERSION/SDK_INT"
+                " :android-release android.os.Build$VERSION/RELEASE"
                 " :clojure (clojure-version)"
-                " :pid (.pid (java.lang.ProcessHandle/current))}")
+                " :pid (android.os.Process/myPid)}")
         return _format_eval(client.eval(code))
 
     if name == "nrepl_interrupt":
