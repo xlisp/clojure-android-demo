@@ -125,6 +125,15 @@ isError: true
 - **`android_ui_show` needs a foreground Activity.** `demo.ui/show!` reads
   `MyApp/currentActivity` (set by an `ActivityLifecycleCallbacks`). If the app
   is backgrounded it returns `:no-activity`.
+- **`android_screenshot` flow.** On the UI thread it draws
+  `(.getDecorView (.getWindow currentActivity))` into a scaled `ARGB_8888`
+  `Bitmap`, compresses to PNG with `Bitmap.CompressFormat/PNG`, and base64-
+  encodes with `android.util.Base64/NO_WRAP`. A `CountDownLatch` hops the bytes
+  back to the eval thread before they're emitted between `##PNG##` / `##END##`
+  markers (Python parses the markers out of nREPL stdout). **Gotcha:** the
+  base64 must be printed on the **eval thread**, not the UI thread — nREPL only
+  captures `*out*` on the thread it's bound on, so a UI-thread `println` is
+  silently dropped.
 
 ## Troubleshooting
 
