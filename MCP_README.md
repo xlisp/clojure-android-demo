@@ -66,12 +66,19 @@ different transport.
 | `android_ui_show` | — | `(require 'demo.ui :reload)` + `(demo.ui/show!)`. Swaps the Clojure-built View onto the foreground Activity. |
 | `android_toast` | `message` (str), `long` (bool) | Post a Toast on the main looper using the app `Context` stashed in `DalvikDynamicClassLoader/applicationContext`. |
 | `android_vm_info` | — | Sanity probe: VM name/version, Android SDK + release, Clojure version, PID. |
+| `android_screenshot` | `scale` ∈ (0,1] (default 0.5), `save_path` (optional str) | Capture the foreground Activity's root View as a PNG. Returns MCP `image` content inline + a text line with dimensions. Optionally writes a copy to `save_path` on the host. |
 | `nrepl_interrupt` | — | Send an `:interrupt` op on the current nREPL session. |
 
 Tool results are returned as MCP `text` content with the captured stdout, then
 the printed values prefixed by `=> `. On failure (eval exception, stderr,
 `error`/`eval-error`/`namespace-not-found` status) the result is marked
 `isError: true` and includes the exception class.
+
+`android_screenshot` is the only tool that returns mixed content:
+`[{"type":"image","mimeType":"image/png","data":"<base64>"}, {"type":"text", ...}]`.
+**App-internal only** — it draws the demo app's own `decorView`, so other apps,
+system UI panels, and IME windows are not captured. Backgrounded app → the tool
+errors with `no foreground activity` (because `MyApp/currentActivity` is nil).
 
 ## Verified on a real device (Android 12 / SDK 31 / Dalvik / Clojure 1.13.0)
 
@@ -88,6 +95,8 @@ android_vm_info  —                               =>  {:vm "Dalvik", :vm-versio
                                                      :clojure "1.13.0-master-SNAPSHOT", :pid 6768}
 android_toast    {message:"hello 🎉", long:true}  =>  :toast-posted
 android_ui_show  —                               =>  :shown
+android_screenshot {scale:0.4, save_path:…}      =>  image/png, 432x912, 33825 bytes (saved)
+android_screenshot {scale:1.0}                   =>  image/png, 1080x2280, 117080 bytes
 nrepl_interrupt  —                               status=["done","session-idle"]
 ```
 

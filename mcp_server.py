@@ -14,8 +14,10 @@ Wire into Claude Code (~/.claude/settings.json or .mcp.json):
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
+import re
 import socket
 import sys
 import threading
@@ -316,7 +318,69 @@ TOOLS: list[dict] = [
         "description": "Send an :interrupt op to the current nREPL session.",
         "inputSchema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "android_screenshot",
+        "description":
+            "Capture the foreground Activity's root View as a PNG and return it "
+            "inline as MCP image content (visible to image-capable clients). "
+            "App-internal only — does NOT capture other apps or system UI. "
+            "Requires the demo app to be foregrounded.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "scale": {"type": "number", "default": 0.5,
+                          "description": "Downscale factor, in (0, 1]. 0.5 ≈ 4x smaller PNG."},
+                "save_path": {"type": "string",
+                              "description": "Optional host filesystem path to also write the PNG to."},
+            },
+        },
+    },
 ]
+
+
+SCREENSHOT_CLJ = r"""
+(let [act com.example.clojuredemo.MyApp/currentActivity
+      scale (double %(scale)s)]
+  (when (nil? act) (throw (ex-info "no foreground activity" {})))
+  (let [latch (java.util.concurrent.CountDownLatch. 1)
+        result (atom nil)]
+    (.runOnUiThread
+      act
+      #(try
+         (let [view (.getDecorView (.getWindow act))
+               w (.getWidth view)
+               h (.getHeight view)
+               sw (int (max 1 (Math/round (* (double w) scale))))
+               sh (int (max 1 (Math/round (* (double h) scale))))
+               bmp (android.graphics.Bitmap/createBitmap
+                     sw sh android.graphics.Bitmap$Config/ARGB_8888)
+               canvas (android.graphics.Canvas. bmp)]
+           (when (not= 1.0 scale)
+             (.scale canvas (float scale) (float scale)))
+           (.draw view canvas)
+           (let [baos (java.io.ByteArrayOutputStream.)]
+             (.compress bmp android.graphics.Bitmap$CompressFormat/PNG 100 baos)
+             (.recycle bmp)
+             (reset! result
+                     {:w sw :h sh
+                      :png (android.util.Base64/encodeToString
+                             (.toByteArray baos)
+                             android.util.Base64/NO_WRAP)})))
+         (catch Throwable t
+           (reset! result {:error (str (.getMessage t)) :class (str (class t))}))
+         (finally (.countDown latch))))
+    (when-not (.await latch 15 java.util.concurrent.TimeUnit/SECONDS)
+      (throw (ex-info "screenshot timed out" {})))
+    (let [r @result]
+      (if (:error r)
+        (throw (ex-info (:error r) r))
+        (do
+          (print "##PNG##") (print (:png r)) (println "##END##")
+          (select-keys r [:w :h]))))))
+"""
+
+_PNG_RE = re.compile(r"##PNG##(.*?)##END##", re.DOTALL)
+_DIMS_RE = re.compile(r":w\s+(\d+),?\s*:h\s+(\d+)")
 
 
 def _toast_code(msg: str, long_: bool) -> str:
@@ -333,37 +397,79 @@ def _toast_code(msg: str, long_: bool) -> str:
     )
 
 
-def run_tool(client: NreplClient, name: str, args: dict) -> tuple[str, bool]:
+def _t(text: str) -> list[dict]:
+    return [{"type": "text", "text": text}]
+
+
+def _eval_content(r: dict) -> tuple[list[dict], bool]:
+    text, is_err = _format_eval(r)
+    return _t(text), is_err
+
+
+def _screenshot(client: NreplClient, args: dict) -> tuple[list[dict], bool]:
+    scale = float(args.get("scale", 0.5))
+    if not (0.0 < scale <= 1.0):
+        return _t(f"ERROR: scale must be in (0, 1], got {scale}"), True
+    r = client.eval(SCREENSHOT_CLJ % {"scale": repr(scale)})
+    text, is_err = _format_eval(r)
+    if is_err:
+        return _t(text), True
+    m = _PNG_RE.search(r["out"])
+    if not m:
+        return _t(f"ERROR: no PNG marker found in stdout (got {len(r['out'])} bytes)"), True
+    b64 = m.group(1).strip()
+    try:
+        png = base64.b64decode(b64, validate=True)
+    except Exception as e:
+        return _t(f"ERROR: base64 decode failed: {e}"), True
+    if png[:8] != b"\x89PNG\r\n\x1a\n":
+        return _t(f"ERROR: not a PNG (magic={png[:8]!r})"), True
+    dims = _DIMS_RE.search((r["value"] or [""])[0])
+    dim_s = f"{dims.group(1)}x{dims.group(2)}" if dims else "?"
+    note = f"{dim_s} PNG, {len(png)} bytes"
+    save_path = args.get("save_path")
+    if isinstance(save_path, str) and save_path:
+        try:
+            with open(save_path, "wb") as f:
+                f.write(png)
+            note += f" (saved to {save_path})"
+        except OSError as e:
+            note += f" (save failed: {e})"
+    return [{"type": "image", "data": b64, "mimeType": "image/png"},
+            {"type": "text", "text": note}], False
+
+
+def run_tool(client: NreplClient, name: str, args: dict) -> tuple[list[dict], bool]:
     if name == "clojure_eval":
         code = args.get("code")
         if not isinstance(code, str) or not code.strip():
-            return "ERROR: missing 'code'", True
-        return _format_eval(client.eval(code, args.get("ns") or "user"))
+            return _t("ERROR: missing 'code'"), True
+        return _eval_content(client.eval(code, args.get("ns") or "user"))
 
     if name == "clojure_require":
         ns = args.get("ns")
         if not isinstance(ns, str) or not ns:
-            return "ERROR: missing 'ns'", True
+            return _t("ERROR: missing 'ns'"), True
         suffix = " :reload" if args.get("reload") else ""
-        return _format_eval(client.eval(f"(require '{ns}{suffix})"))
+        return _eval_content(client.eval(f"(require '{ns}{suffix})"))
 
     if name == "clojure_load_file":
         path = args.get("path")
         if not isinstance(path, str) or not os.path.isfile(path):
-            return f"ERROR: file not found: {path}", True
+            return _t(f"ERROR: file not found: {path}"), True
         with open(path, "r", encoding="utf-8") as f:
             code = f.read()
-        return _format_eval(client.eval(code))
+        return _eval_content(client.eval(code))
 
     if name == "android_ui_show":
-        return _format_eval(client.eval(
+        return _eval_content(client.eval(
             "(do (require 'demo.ui :reload) (demo.ui/show!))"))
 
     if name == "android_toast":
         msg = args.get("message")
         if not isinstance(msg, str):
-            return "ERROR: missing 'message'", True
-        return _format_eval(client.eval(_toast_code(msg, bool(args.get("long", True)))))
+            return _t("ERROR: missing 'message'"), True
+        return _eval_content(client.eval(_toast_code(msg, bool(args.get("long", True)))))
 
     if name == "android_vm_info":
         code = ("{:vm (System/getProperty \"java.vm.name\")"
@@ -373,12 +479,15 @@ def run_tool(client: NreplClient, name: str, args: dict) -> tuple[str, bool]:
                 " :android-release android.os.Build$VERSION/RELEASE"
                 " :clojure (clojure-version)"
                 " :pid (android.os.Process/myPid)}")
-        return _format_eval(client.eval(code))
+        return _eval_content(client.eval(code))
 
     if name == "nrepl_interrupt":
-        return f"status={client.interrupt()}", False
+        return _t(f"status={client.interrupt()}"), False
 
-    return f"ERROR: unknown tool '{name}'", True
+    if name == "android_screenshot":
+        return _screenshot(client, args)
+
+    return _t(f"ERROR: unknown tool '{name}'"), True
 
 
 # ------------------------------------------------------------------ MCP -----
@@ -420,13 +529,10 @@ def handle_message(client: NreplClient, msg: dict, write) -> None:
         name = params.get("name")
         args = params.get("arguments") or {}
         try:
-            text, is_error = run_tool(client, name, args)
+            content, is_error = run_tool(client, name, args)
         except Exception as e:
-            text, is_error = f"ERROR: {type(e).__name__}: {e}", True
-        _reply(write, msg_id, {
-            "content": [{"type": "text", "text": text}],
-            "isError": is_error,
-        })
+            content, is_error = _t(f"ERROR: {type(e).__name__}: {e}"), True
+        _reply(write, msg_id, {"content": content, "isError": is_error})
         return
     if msg_id is not None:
         _reply(write, msg_id, error={"code": -32601,
