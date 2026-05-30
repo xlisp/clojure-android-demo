@@ -172,7 +172,7 @@
       (.setBackgroundColor (Color/parseColor "#1565C0"))
 
       (.addView (doto (TextView. activity)
-                  (.setText "Clojure 计算器 🧮")
+                  (.setText "Clojure Calculator 🧮")
                   (.setTextSize 20.0)
                   (.setTextColor (Color/parseColor "#FFFFFF"))))
 

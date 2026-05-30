@@ -41,16 +41,16 @@
                   (.setTextSize 16.0)
                   (.setTextColor (Color/parseColor "#37474F"))
                   (.setPadding 0 (dp activity 16) 0 0)
-                  (.setText "（结果会显示在这里）"))
+                  (.setText "result in here"))
          input  (doto (EditText. activity)
-                  (.setHint "在这里输入文字…")
+                  (.setHint "Input text…")
                   (.setText (or prefill ""))
                   (.setSingleLine true))
          submit (fn [_]
                   (let [s (str (.getText input))]
-                    (on-ui #(.setText result (str "你输入了：" s)))
+                    (on-ui #(.setText result (str "input: " s)))
                     (.show (Toast/makeText activity
-                                           (str "提交：" s)
+                                           (str "submit：" s)
                                            Toast/LENGTH_SHORT))))]
      ;; submit on the keyboard's IME action too -- set on `input` itself, not
      ;; inside the LinearLayout doto (doto would thread the layout in here).
@@ -62,21 +62,21 @@
        (.setOrientation LinearLayout/VERTICAL)
        (.setPadding pad pad pad pad)
        (.addView (doto (TextView. activity)
-                   (.setText "输入测试 ✍️")
+                   (.setText "input test ✍️")
                    (.setTextSize 24.0)
                    (.setTextColor (Color/parseColor "#2E7D32"))
                    (.setPadding 0 0 0 (dp activity 16))))
        (.addView input)
        (.addView (doto (Button. activity)
-                   (.setText "提交")
+                   (.setText "submit")
                    (.setOnClickListener (click submit))))
        (.addView (doto (Button. activity)
-                   (.setText "清空")
+                   (.setText "clean")
                    (.setOnClickListener
                      (click (fn [_]
                               (on-ui (fn []
                                        (.setText input "")
-                                       (.setText result "（结果会显示在这里）"))))))))
+                                       (.setText result "result in here"))))))))
        (.addView result)))))
 
 (defn show!
