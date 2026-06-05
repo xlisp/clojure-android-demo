@@ -121,7 +121,7 @@
   read by the x-axis formatter so labels stay in sync after each reload."
   ^LineChart [^Activity activity dates*]
   (let [chart (LineChart. activity)]
-    (.setDescription (.getDescription chart) nil)
+    (.setEnabled (.getDescription chart) false)
     (doto chart
       (.setNoDataText "拉取中…")
       (.setBackgroundColor (Color/parseColor "#102027"))
@@ -140,7 +140,7 @@
       (.setLabelCount 5)
       (.setValueFormatter
         (proxy [ValueFormatter] []
-          (getFormattedValue [^float value]
+          (getFormattedValue [value]
             (let [ds @dates* i (int value)]
               (if (and (>= i 0) (< i (count ds)))
                 (subs (nth ds i) 5)              ; "MM-dd"
