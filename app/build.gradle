@@ -73,4 +73,10 @@ dependencies {
 
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.drawerlayout:drawerlayout:1.2.0'   // left navigation drawer
+
+    // K-line chart + HTTP for demo/kline.clj. Both are ordinary build-time deps:
+    // DEX'd into the APK, loaded by the app PathClassLoader, then referenced from
+    // on-device-compiled Clojure (the generated classes' parent loader sees them).
+    implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'   // LineChart (JitPack)
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
 }

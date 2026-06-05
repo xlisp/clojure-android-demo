@@ -11,6 +11,7 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         maven { url 'https://repo.clojars.org' }   // nREPL is published to Clojars
+        maven { url 'https://jitpack.io' }         // MPAndroidChart is published to JitPack
     }
 }
 
