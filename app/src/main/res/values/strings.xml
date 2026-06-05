@@ -7,6 +7,7 @@
     <string name="menu_clojure_ui">Clojure UI demo 🍃</string>
     <string name="menu_calc">Calculator 🧮</string>
     <string name="menu_input">Input demo ⌨️</string>
+    <string name="menu_kline">K-line 📈</string>
     <string name="drawer_open">Open menu</string>
     <string name="drawer_close">Close menu</string>
 </resources>

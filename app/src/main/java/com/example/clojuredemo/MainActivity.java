@@ -84,6 +84,7 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.menu_clojure_ui).setOnClickListener(v -> showClojurePage("demo.ui"));
         findViewById(R.id.menu_calc).setOnClickListener(v -> showClojurePage("demo.calc"));
         findViewById(R.id.menu_input).setOnClickListener(v -> showClojurePage("demo.input"));
+        findViewById(R.id.menu_kline).setOnClickListener(v -> showClojurePage("demo.kline"));
 
         append("Booting Clojure runtime…");
         bootstrapAsync();

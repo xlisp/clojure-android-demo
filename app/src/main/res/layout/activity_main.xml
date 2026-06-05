@@ -72,6 +72,17 @@
             android:padding="20dp"
             android:text="@string/menu_input"
             android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/menu_kline"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?android:attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="20dp"
+            android:text="@string/menu_kline"
+            android:textSize="16sp" />
     </LinearLayout>
 
 </androidx.drawerlayout.widget.DrawerLayout>
